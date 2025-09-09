@@ -1,0 +1,1 @@
+#training script for the CNN
