@@ -1,1 +1,0 @@
-#layer definitions, e.g. convolutional layers, pooling layers, etc.

@@ -1,5 +1,5 @@
 #helper functions for the CNN, e.g. loading dataset, ReLU, padding, etc.
-import numpy as cp
+import cupy as cp
 
 ## Computes the softmax for a 1-D vector
 ## inputs: x -> 1-D vector, grad -> true if you want the gradiant, false otherwise
@@ -26,9 +26,3 @@ def LeakyRelU(x, grad = False):
     if x <= 0:
         return alpha
     return 1
-
-test = cp.array ([-10, -5, 0, 5, 10])
-
-for x in test:
-    print(LeakyRelU(x))
-    print(LeakyRelU(x, True))
