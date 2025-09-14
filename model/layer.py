@@ -3,7 +3,7 @@ import cupy as cp
 from typing import Tuple
 
 class Layer:
-    def __init__(self, input_shape:Tuple[int, int, int, int]=None, activation_func=None, first:bool=False): #input shape is (batch size, height, width, channels)
+    def __init__(self, input_shape:Tuple[int, int, int, int]=None, activation_func=None, first:bool=False): #input shape is nhwc (batch size, height, width, channels)
         self.input_shape = input_shape
         self.activation_func = activation_func
         self.first = first
