@@ -1,14 +1,14 @@
 # the pooling layer class
-from model.layer import Layer
+from layer import Layer
 from typing import Tuple
 import cupy as cp
 
 class Pool(Layer):
     def __init__(self, pool_size: Tuple[int, int], stride: int = 2, input_shape: Tuple[int, int, int] = None, activation: str = None, first: bool = False):
-        super().__init__(input_shape=input_shape, activation=activation, first=first)
+        super().__init__(input_shape=input_shape, activation_func=activation, first=first)
         self.pool_size = pool_size
         self.stride = stride
-        self.cache = None
+        self.cache = {}
 
     def initialize(self, input_shape):
         batch_size, height, width, channels = input_shape
