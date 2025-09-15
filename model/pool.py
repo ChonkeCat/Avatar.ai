@@ -16,6 +16,7 @@ class Pool(Layer):
         h_out = (height - h_poll) // self.stride + 1
         w_out = (width - w_poll) // self.stride + 1
         self.output_shape = (batch_size, h_out, w_out, channels)
+        return self.output_shape
 
     def forward(self, A_prev):
         self.A_prev = A_prev
@@ -48,8 +49,8 @@ class Pool(Layer):
                 h_end = h_start + h_size
                 w_start = j * self.stride
                 w_end = w_start + w_size
-
                 self.A[:, h_start:h_end, w_start:w_end, :] += gradient[:, i:i + 1, j:j + 1, :] * self.cache[(i, j)]
+                
         return self.A
 
     def save_mask(self, slice, cords):
