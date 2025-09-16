@@ -1,8 +1,8 @@
 #layer definition, skeleton class for layers
-import numpy as cp #change is cupy if using gpu
+import numpy as cp # change is cupy if using gpu
 from typing import Tuple
 
-class Layer:
+class Layer():
     def __init__(self, input_shape:Tuple[int, int, int, int]=None, activation_func=None, first:bool=False): #input shape is nhwc (batch size, height, width, channels)
         self.input_shape = input_shape
         self.activation_func = activation_func
