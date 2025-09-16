@@ -1,5 +1,5 @@
 #layer definition, skeleton class for layers
-import numpy as cp
+import numpy as cp #change is cupy if using gpu
 from typing import Tuple
 
 class Layer:
@@ -29,5 +29,5 @@ class Layer:
     def forward(self, input): # will be defined in child classes
         pass
 
-    def backward(self, output_grad, learning_rate): # will be defined in child classes
+    def backward(self, gradient): # will be defined in child classes
         pass

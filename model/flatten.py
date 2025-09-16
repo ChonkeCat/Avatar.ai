@@ -1,16 +1,16 @@
 # the flatten layer class
 from layer import Layer
 from typing import Tuple
-import cupy as cp
+import numpy as cp # change is cupy if using gpu
 
-class faltten(Layer):
+class flatten(Layer):
     def __init__(self, input_shape: Tuple[int, int, int, int] = None, activation_func=None, first = False):
         super().__init__(input_shape = input_shape, activation_func = activation_func, first = first)
 
     def initialize(self, input_shape):
-        out = cp.zeros(shape=input_shape)
-        out.flatten()
-        self.out_shape = out.shape
+        batch_size = input_shape[0]
+        flattened_size = cp.prod(input_shape[1:])
+        self.out_shape = (batch_size, flattened_size)
         return self.out_shape
     
     def forward(self, A_prev):
