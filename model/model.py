@@ -34,13 +34,15 @@ class model():
         return gradient
     
     def update(self, learning_rate, beta1=0.9, beta2=0.99):
-        for i in range(len(self.layers)):
-            actual_learning_rate = self.learning_rate_mask[i] * learning_rate
-            # adam optimization
-            self.Layers[i].mo = self.Layers[i].mo * beta1 + (1-beta1) * self.Layers[i].dW
-            self.Layers[i].acc = beta2*self.Layers[i].acc  + (1-beta2) * (self.Layers[i].dW*self.Layers[i].dW)
-            self.Layers[i].W = self.Layers[i].W - actual_learning_rate * self.Layers[i].mo/(cp.sqrt(self.Layers[i].acc) + 1e-07)   
+        for layer, lr_ratio in zip(self.Layers, self.learning_rate_mask):
+            actual_learning_rate = lr_ratio * learning_rate
 
-            self.Layers[i].mo_b = self.Layers[i].mo_b*beta1 + (1-beta1)*self.Layers[i].db
-            self.Layers[i].acc_b = beta2 * self.Layers[i].acc_b  + (1-beta2) * (self.Layers[i].db*self.Layers[i].db)
-            self.Layers[i].b = self.Layers[i].b - actual_learning_rate * self.Layers[i].mo_b/(cp.sqrt(self.Layers[i].acc_b) + 1e-07)
+            # Adam updates for weights
+            layer.mo = beta1 * layer.mo + (1 - beta1) * layer.dW
+            layer.acc = beta2 * layer.acc + (1 - beta2) * (layer.dW * layer.dW)
+            layer.W -= actual_learning_rate * layer.mo / (cp.sqrt(layer.acc) + 1e-7)
+
+            # Adam updates for biases
+            layer.mo_b = beta1 * layer.mo_b + (1 - beta1) * layer.db
+            layer.acc_b = beta2 * layer.acc_b + (1 - beta2) * (layer.db * layer.db)
+            layer.b -= actual_learning_rate * layer.mo_b / (cp.sqrt(layer.acc_b) + 1e-7)
