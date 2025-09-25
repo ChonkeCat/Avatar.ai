@@ -1,5 +1,5 @@
 #model architecture definition, e.g. forward pass, etc.
-import cupy as cp
+import numpy as cp
 
 class model():
     def __init__(self):
@@ -19,7 +19,7 @@ class model():
         self.layers = self.layers[:-1]
 
     def compile(self):
-        output_shape = self.layers[0].initialize(self.Layers[0].input_shape)
+        output_shape = self.layers[0].initialize(self.layers[0].input_shape)
         for i in range(len(self.layers[1:])):
             output_shape = self.layers[i + 1].initialize(output_shape)
 
@@ -34,7 +34,7 @@ class model():
         return gradient
     
     def update(self, learning_rate, beta1=0.9, beta2=0.99):
-        for layer, lr_ratio in zip(self.Layers, self.learning_rate_mask):
+        for layer, lr_ratio in zip(self.layers, self.learning_rate_mask):
             actual_learning_rate = lr_ratio * learning_rate
 
             # Adam updates for weights

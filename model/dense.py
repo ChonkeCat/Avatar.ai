@@ -1,6 +1,7 @@
 # the dense layer class
 from layer import Layer
 from typing import Tuple
+from utils.cnn_utils import softmax
 import numpy as cp # change is cupy if using gpu
 
 class dense(Layer):
@@ -13,13 +14,13 @@ class dense(Layer):
         bias_shape = (1, self.neurons)
         self.out_shape = [input_shape[0], self.neurons]
         self.W = cp.random.randn(self.neurons, input_length)/cp.sqrt(input_length)
-        self.b = cp.full(bias_shape, 0)
-        self.db = cp.full(bias_shape, 0)
+        self.b = cp.full(bias_shape, 0.0, dtype=cp.float32)
+        self.db = cp.full(bias_shape, 0.0, dtype=cp.float32)
         #optimizer stuff
-        self.mo = cp.full(self.W.shape, 0)
-        self.acc = cp.full(self.W.shape, 0)
-        self.mo_b = cp.full(bias_shape, 0)
-        self.acc_b = cp.full(bias_shape, 0)
+        self.mo = cp.full(self.W.shape, 0.0, dtype=cp.float32)
+        self.acc = cp.full(self.W.shape, 0.0, dtype=cp.float32)
+        self.mo_b = cp.full(bias_shape, 0.0, dtype=cp.float32)
+        self.acc_b = cp.full(bias_shape, 0.0, dtype=cp.float32)
         return self.out_shape
 
     def forward(self, A_prev):
@@ -29,8 +30,9 @@ class dense(Layer):
         return self.A
 
     def backward(self, gradient):
-        pre_activation_wrt_activation_gradient = self.activation_func(self.A, grad = True)
+        pre_activation_wrt_activation_gradient = self.activation_func(self.A, grad=True)
         pre_activation_gradient = pre_activation_wrt_activation_gradient * gradient
+
         pre_activation_wrt_weights_gradient = self.A_prev
         batch = self.A_prev.shape[0]
         self.dW = cp.dot(pre_activation_gradient.T, pre_activation_wrt_weights_gradient)/batch

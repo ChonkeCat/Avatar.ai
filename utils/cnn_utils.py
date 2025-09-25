@@ -1,5 +1,5 @@
 #helper functions for the CNN, e.g. loading dataset, ReLU, padding, etc.
-import cupy as cp
+import numpy as cp
 
 ## Computes the softmax for a 1-D vector
 ## inputs: x -> 1-D vector, grad -> true if you want the gradiant, false otherwise
@@ -7,22 +7,26 @@ import cupy as cp
 ##          or nxn jacobian of the softmax
 
 def softmax(x, grad = False):
-    shiftx = x - cp.max(x) #shifts the values in x, for computational stabillity
+    if grad:
+        return x
+    shiftx = x - cp.max(x, axis=1, keepdims=True) 
     expx = cp.exp(shiftx)
-    if not grad:
-        return expx / cp.sum(expx)
-    x = expx / cp.sum(expx)
-    x = x.reshape(-1, 1)
-    return cp.diagflat(x) - cp.dot(x, x.T)
+    return expx / cp.sum(expx, axis=1, keepdims=True)
 
 
 ## LeakyRelU activation function, returns x if it is greater than or equal to 0, returns 0 otherwise
 ## inputs: x -> float, grad => true if you want the gradiant, false otherwise
 
-def LeakyRelU(x, grad = False):
+def LeakyRelU(x, grad=False):
     alpha = 0.05
-    if not grad:
-        return cp.maximum(alpha*x, x)
-    if x <= 0:
-        return alpha
-    return 1
+    if grad:
+        return cp.where(x > 0, 1.0, alpha)
+    return cp.maximum(alpha * x, x)
+
+def crossentropyloss(y_actual, y_pred, grad=False):
+    if grad:
+        return y_pred - y_actual
+    else:
+        y_pred = cp.clip(y_pred, 1e-7, 1 - 1e-7)
+        loss = -cp.mean(cp.sum(y_actual * cp.log(y_pred), axis=1))
+        return loss
