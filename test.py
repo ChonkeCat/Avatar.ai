@@ -1,7 +1,7 @@
 import numpy as cp
-from model import model
-from dense import dense  # your Dense layer
-from utils.cnn_utils import LeakyRelU, softmax, crossentropyloss  # your activations
+from model.model import model
+from model.dense import dense  # your Dense layer
+from utils.cnn_utils import LeakyRelU, softmax, crossentropyloss
 
 # Dummy input (batch_size=2, features=10)
 x = cp.random.randn(2, 10)

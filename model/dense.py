@@ -1,7 +1,6 @@
 # the dense layer class
 from layer import Layer
 from typing import Tuple
-from utils.cnn_utils import softmax
 import numpy as cp # change is cupy if using gpu
 
 class dense(Layer):
