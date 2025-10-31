@@ -7,7 +7,7 @@ class model():
         self.learning_rate_mask = []
         # add stats later
 
-    def add(self, layer, lr_ratio):
+    def add(self, layer, lr_ratio=1):
         self.layers.append(layer)
         self.learning_rate_mask.append(lr_ratio)
 
