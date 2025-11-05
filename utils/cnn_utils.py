@@ -35,12 +35,23 @@ def crossentropyloss(y_actual, y_pred, grad=False):
         return loss
 
 def process_dataset(path):
-    for folder in os.listdir(path):
-        count = len([f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))])
-        images = []
-        labels = []
-        label = [0] * count
-        for image in os.listdir(folder):
-            images.append(cp.asarray(Image.open(image)))
-            labels.append(label)
+    images = []
+    labels = []
+    folders = [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
+
+    for i, folder in enumerate(folders):
+        label = [0] * len(folders)
+        label[i] = 1
+
+        folder_path = os.path.join(path, folder)
+        for file_name in os.listdir(folder_path):
+            file_path = os.path.join(folder_path, file_name)
+            if os.path.isfile(file_path):
+                try:
+                    img = Image.open(file_path).convert("RGB")
+                    images.append(cp.asarray(img))
+                    labels.append(label)
+                except Exception as e:
+                    print(f"Skipping {file_path}: {e}")
+
     return images, labels
