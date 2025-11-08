@@ -1,5 +1,6 @@
 #model architecture definition, e.g. forward pass, etc.
-import numpy as cp
+import cupy as cp
+import pickle
 
 class model():
     def __init__(self):
@@ -46,3 +47,17 @@ class model():
             layer.mo_b = beta1 * layer.mo_b + (1 - beta1) * layer.db
             layer.acc_b = beta2 * layer.acc_b + (1 - beta2) * (layer.db * layer.db)
             layer.b -= actual_learning_rate * layer.mo_b / (cp.sqrt(layer.acc_b) + 1e-7)
+
+    def train(self, loss_func, x, y, epochs = 50, learning_rate = 0.001, decay = 0.96):
+        pass
+
+    def save(self, path):
+        save = open(path, "wb")
+        pickle.dump(self, save)
+        save.close()
+
+    def load(self, path):
+        load = open(path, "rb")
+        model = pickle.load(load)
+        load.close()
+        return model

@@ -1,7 +1,7 @@
 # the 2D convolution layer class
 from model.layer import Layer
 from typing import Tuple
-import numpy as np  # change to cupy later *Jerry
+import cupy as np  # change to cupy later *Jerry
 from utils.im2col import Im2Col
 
 class Conv2D(Layer):

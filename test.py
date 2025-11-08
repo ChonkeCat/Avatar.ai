@@ -1,4 +1,4 @@
-import numpy as cp
+import cupy as cp
 from model.model import model
 from model.dense import dense
 from model.Conv2D import Conv2D
