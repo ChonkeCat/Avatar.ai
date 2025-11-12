@@ -1,6 +1,7 @@
 #model architecture definition, e.g. forward pass, etc.
-import cupy as cp
+import numpy as cp
 import pickle
+import random
 
 class model():
     def __init__(self):
@@ -48,9 +49,24 @@ class model():
             layer.acc_b = beta2 * layer.acc_b + (1 - beta2) * (layer.db * layer.db)
             layer.b -= actual_learning_rate * layer.mo_b / (cp.sqrt(layer.acc_b) + 1e-7)
 
-    def train(self, loss_func, x, y, epochs = 50, learning_rate = 0.001, decay = 0.96):
-        pass
+    def train(self, loss_func, x, y, epochs = 50, learning_rate = 0.001, decay = 0.96, batch_size = 64):
+        combined = list(zip(x, y))
+        random.shuffle(combined)
+        x, y = zip(*combined)
+        for i in range(0, len(x), batch_size):
+            yield x[i:i + batch_size], y[i:i + batch_size]
 
+        split_point = int(len(x) * 0.8)
+
+        train_x = x[:split_point]
+        train_y = y[:split_point]
+
+        test_x = x[split_point:]
+        test_y = y[split_point:]
+      
+        print("Train:", train_x, train_y)
+        print("Test:", test_x, test_y)
+            
     def save(self, path):
         save = open(path, "wb")
         pickle.dump(self, save)

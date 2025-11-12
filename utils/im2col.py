@@ -1,4 +1,4 @@
-import cupy as np
+import numpy as np
 from typing import Tuple, Optional
 
 class Im2Col:

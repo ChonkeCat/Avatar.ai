@@ -1,7 +1,7 @@
 # the flatten layer class
 from .layer import Layer
 from typing import Tuple
-import cupy as cp # change is cupy if using gpu
+import numpy as cp # change is cupy if using gpu
 import math
 
 class flatten(Layer):
