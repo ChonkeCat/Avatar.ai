@@ -35,37 +35,93 @@ class model():
             gradient = layer.backward(gradient)
         return gradient
     
-    def update(self, learning_rate, beta1=0.9, beta2=0.99):
+    def update(self, learning_rate, batch_size, beta1=0.9, beta2=0.99):
         for layer, lr_ratio in zip(self.layers, self.learning_rate_mask):
             actual_learning_rate = lr_ratio * learning_rate
 
+            # Scale gradients by batch size
+            grad_W = layer.dW / batch_size
+            grad_b = layer.db / batch_size
+
             # Adam updates for weights
-            layer.mo = beta1 * layer.mo + (1 - beta1) * layer.dW
-            layer.acc = beta2 * layer.acc + (1 - beta2) * (layer.dW * layer.dW)
+            layer.mo = beta1 * layer.mo + (1 - beta1) * grad_W
+            layer.acc = beta2 * layer.acc + (1 - beta2) * (grad_W * grad_W)
             layer.W -= actual_learning_rate * layer.mo / (cp.sqrt(layer.acc) + 1e-7)
 
             # Adam updates for biases
-            layer.mo_b = beta1 * layer.mo_b + (1 - beta1) * layer.db
-            layer.acc_b = beta2 * layer.acc_b + (1 - beta2) * (layer.db * layer.db)
+            layer.mo_b = beta1 * layer.mo_b + (1 - beta1) * grad_b
+            layer.acc_b = beta2 * layer.acc_b + (1 - beta2) * (grad_b * grad_b)
             layer.b -= actual_learning_rate * layer.mo_b / (cp.sqrt(layer.acc_b) + 1e-7)
 
     def train(self, loss_func, x, y, epochs = 50, learning_rate = 0.001, decay = 0.96, batch_size = 64):
         combined = list(zip(x, y))
         random.shuffle(combined)
         x, y = zip(*combined)
-        for i in range(0, len(x), batch_size):
-            yield x[i:i + batch_size], y[i:i + batch_size]
+        x = list(x)
+        y = list(y)
 
         split_point = int(len(x) * 0.8)
+        train_x, val_x = x[:split_point], x[split_point:]
+        train_y, val_y = y[:split_point], y[split_point:]
 
-        train_x = x[:split_point]
-        train_y = y[:split_point]
+        def batchify(a, b, batch_size):
+            for i in range(0, len(a), batch_size):
+                yield cp.array(a[i:i+batch_size]), cp.array(b[i:i+batch_size])
 
-        test_x = x[split_point:]
-        test_y = y[split_point:]
-      
-        print("Train:", train_x, train_y)
-        print("Test:", test_x, test_y)
+        train_batches = list(batchify(train_x, train_y, batch_size))
+        val_batches = list(batchify(val_x, val_y, batch_size))
+
+        def one_hot_accuracy(y_pred, y_true):
+            pred_class = cp.argmax(y_pred, axis=-1)
+            true_class = cp.argmax(y_true, axis=-1)
+            return (pred_class == true_class).sum()
+
+        for epoch in range(epoch):
+            total_loss = 0
+            total_correct = 0
+            total_samples = 0
+
+            for batch_x, batch_y in train_batches:
+                pred = self.forward(batch_x)
+                total_loss += loss_func(batch_y, pred, grad=False)
+
+                self.backward(loss_func(batch_y, pred, grad=True))
+
+                self.update(learning_rate, batch_size=batch_x.shape[0])
+
+                total_correct += one_hot_accuracy(pred, batch_y)
+                total_samples += batch_x.shape[0]
+                    
+            epoch_loss = total_loss / total_samples
+            epoch_acc  = total_correct / total_samples
+
+            val_loss = 0
+            val_correct = 0
+            val_samples = 0
+
+            for batch_x, batch_y in val_batches:
+                pred = self.forward(batch_x)
+                
+                val_loss += loss_func(batch_y, pred, grad=False)
+                val_correct += one_hot_accuracy(pred, batch_y)
+                val_samples += batch_x.shape[0]
+
+            val_loss = val_loss / val_samples
+            val_acc = val_correct / val_samples
+
+        if not hasattr(self, "best_val_acc"):
+            self.best_val_acc = 0
+            self.best_model_filename_val = None
+
+        if val_acc > self.best_val_acc:
+            self.best_val_acc = val_acc
+            self.best_model_filename_val = f"val_acc{val_acc:.4f}_vloss{val_loss:.4f}_epoch{epoch+1}.pkl"
+            self.save(self.best_model_filename_val)
+
+            learning_rate *= decay
+
+            print(f"Epoch {epoch+1}/{epochs} | Train Loss: {epoch_loss:.4f} | Train Acc: {epoch_acc:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}")
+
             
     def save(self, path):
         save = open(path, "wb")

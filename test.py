@@ -4,7 +4,7 @@ from model.dense import dense
 from model.Conv2D import Conv2D
 from model.flatten import flatten
 from model.pool import Pool
-from utils.cnn_utils import LeakyRelU, softmax, crossentropyloss
+from utils.cnn_utils import LeakyRelU, softmax, crossentropyloss, process_dataset
 
 # Dummy input (batch_size=2, features=10)
 x = cp.random.randn(2, 64, 64, 3)
@@ -69,3 +69,9 @@ for i, (w_before, w_after) in enumerate(zip(W_before, W_after)):
 # ---- CHECK LOSS ----
 loss = crossentropyloss(y_true, y_pred)
 print("Loss:", float(loss))
+
+x, y = process_dataset("C:/Users/ey2ma/Downloads/Avatar.ai/data")
+
+net.train(crossentropyloss, x, y)
+
+
