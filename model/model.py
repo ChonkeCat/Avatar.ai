@@ -68,8 +68,11 @@ class model():
             for i in range(0, len(a), batch_size):
                 yield cp.array(a[i:i+batch_size]), cp.array(b[i:i+batch_size])
 
-        train_batches = list(batchify(train_x, train_y, batch_size))
-        val_batches = list(batchify(val_x, val_y, batch_size))
+        train_batches = [(bx, by) for bx, by in batchify(train_x, train_y, batch_size)
+            if bx.shape[0] == batch_size]
+
+        val_batches = [(bx, by) for bx, by in batchify(val_x, val_y, batch_size)
+            if bx.shape[0] == batch_size]
 
         def one_hot_accuracy(y_pred, y_true):
             pred_class = cp.argmax(y_pred, axis=-1)
@@ -92,7 +95,7 @@ class model():
                 total_correct += one_hot_accuracy(pred, batch_y)
                 total_samples += batch_x.shape[0]
 
-                print(f"Processed batch {batch_num}/{len(train_batches)}")
+                print(f"Processed train batch {batch_num}/{len(train_batches)}")
                     
             epoch_loss = total_loss / total_samples
             epoch_acc  = total_correct / total_samples
@@ -101,12 +104,14 @@ class model():
             val_correct = 0
             val_samples = 0
 
-            for batch_x, batch_y in val_batches:
+            for batch_num, (batch_x, batch_y) in enumerate(val_batches, start=1):
                 pred = self.forward(batch_x)
                 
                 val_loss += loss_func(batch_y, pred, grad=False)
                 val_correct += one_hot_accuracy(pred, batch_y)
                 val_samples += batch_x.shape[0]
+
+                print(f"Processed val batch {batch_num}/{len(val_batches)}")
 
             val_loss = val_loss / val_samples
             val_acc = val_correct / val_samples
@@ -118,11 +123,12 @@ class model():
         if val_acc > self.best_val_acc:
             self.best_val_acc = val_acc
             self.best_model_filename_val = f"val_acc{val_acc:.4f}_vloss{val_loss:.4f}_epoch{epoch+1}.pkl"
+            print("Saving...")
             self.save(self.best_model_filename_val)
 
             learning_rate *= decay
 
-            print(f"Epoch {epoch+1}/{epochs} | Train Loss: {epoch_loss:.4f} | Train Acc: {epoch_acc:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}")
+        print(f"Epoch {epoch+1}/{epochs} | Train Loss: {epoch_loss:.4f} | Train Acc: {epoch_acc:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}")
 
             
     def save(self, path):
