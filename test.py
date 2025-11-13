@@ -7,16 +7,17 @@ from model.pool import Pool
 from utils.cnn_utils import LeakyRelU, softmax, crossentropyloss, process_dataset
 
 # Dummy input (batch_size=2, features=10)
-x = cp.random.randn(2, 64, 64, 3)
+x = cp.random.randn(32, 240, 320, 3)
 
 # Dummy labels (e.g., for classification into 5 classes)
-y_true = cp.array([[0, 0, 1, 0, 0],
+y_true_small = cp.array([[0, 0, 1, 0, 0],
                    [0, 1, 0, 0, 0]])
+y_true = cp.tile(y_true_small, (16, 1))
 
 
 # ---- MODEL SETUP ----
 net = model()
-net.add(Conv2D((3, 3), 64, LeakyRelU, padding='same', input_shape=(2, 64, 64, 3), first=True))
+net.add(Conv2D((3, 3), 64, LeakyRelU, padding='same', input_shape=(32, 240, 320, 3), first=True))
 net.add(Pool((5, 5), 5))
 net.add(Conv2D((3, 3), 64, LeakyRelU, padding='same'))
 net.add(Pool((5, 5), 5))
@@ -48,7 +49,7 @@ for i, layer in enumerate(net.layers):
         print(f"No weights found in layer {i}")
 
 # ---- ADAM OPTIMIZER UPDATE ----
-net.update(learning_rate=0.001)
+net.update(0.001, 2)
 
 # --- Save weights after update ---
 W_after = []

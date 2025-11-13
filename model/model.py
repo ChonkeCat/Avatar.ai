@@ -53,7 +53,7 @@ class model():
             layer.acc_b = beta2 * layer.acc_b + (1 - beta2) * (grad_b * grad_b)
             layer.b -= actual_learning_rate * layer.mo_b / (cp.sqrt(layer.acc_b) + 1e-7)
 
-    def train(self, loss_func, x, y, epochs = 50, learning_rate = 0.001, decay = 0.96, batch_size = 64):
+    def train(self, loss_func, x, y, epochs = 50, learning_rate = 0.001, decay = 0.96, batch_size = 32):
         combined = list(zip(x, y))
         random.shuffle(combined)
         x, y = zip(*combined)
@@ -76,12 +76,12 @@ class model():
             true_class = cp.argmax(y_true, axis=-1)
             return (pred_class == true_class).sum()
 
-        for epoch in range(epoch):
+        for epoch in range(epochs):
             total_loss = 0
             total_correct = 0
             total_samples = 0
 
-            for batch_x, batch_y in train_batches:
+            for batch_num, (batch_x, batch_y) in enumerate(train_batches, start=1):
                 pred = self.forward(batch_x)
                 total_loss += loss_func(batch_y, pred, grad=False)
 
@@ -91,6 +91,8 @@ class model():
 
                 total_correct += one_hot_accuracy(pred, batch_y)
                 total_samples += batch_x.shape[0]
+
+                print(f"Processed batch {batch_num}/{len(train_batches)}")
                     
             epoch_loss = total_loss / total_samples
             epoch_acc  = total_correct / total_samples
