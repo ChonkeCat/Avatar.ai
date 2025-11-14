@@ -1,5 +1,5 @@
 # the pooling layer class
-from layer import Layer
+from .layer import Layer
 from typing import Tuple
 import numpy as cp # change is cupy if using gpu
 

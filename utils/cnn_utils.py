@@ -1,5 +1,8 @@
 #helper functions for the CNN, e.g. loading dataset, ReLU, padding, etc.
 import numpy as cp
+from PIL import Image
+import os
+
 
 ## Computes the softmax for a 1-D vector
 ## inputs: x -> 1-D vector, grad -> true if you want the gradiant, false otherwise
@@ -30,3 +33,25 @@ def crossentropyloss(y_actual, y_pred, grad=False):
         y_pred = cp.clip(y_pred, 1e-7, 1 - 1e-7)
         loss = -cp.mean(cp.sum(y_actual * cp.log(y_pred), axis=1))
         return loss
+
+def process_dataset(path):
+    images = []
+    labels = []
+    folders = [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
+
+    for i, folder in enumerate(folders):
+        label = [0] * len(folders)
+        label[i] = 1
+
+        folder_path = os.path.join(path, folder)
+        for file_name in os.listdir(folder_path):
+            file_path = os.path.join(folder_path, file_name)
+            if os.path.isfile(file_path):
+                try:
+                    img = Image.open(file_path).convert("RGB")
+                    images.append(cp.asarray(img))
+                    labels.append(label)
+                except Exception as e:
+                    print(f"Skipping {file_path}: {e}")
+
+    return images, labels
