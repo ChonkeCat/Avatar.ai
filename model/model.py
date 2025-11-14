@@ -116,19 +116,19 @@ class model():
             val_loss = val_loss / val_samples
             val_acc = val_correct / val_samples
 
-        if not hasattr(self, "best_val_acc"):
-            self.best_val_acc = 0
-            self.best_model_filename_val = None
+            if not hasattr(self, "best_val_acc"):
+                self.best_val_acc = 0
+                self.best_model_filename_val = None
 
-        if val_acc > self.best_val_acc:
-            self.best_val_acc = val_acc
-            self.best_model_filename_val = f"val_acc{val_acc:.4f}_vloss{val_loss:.4f}_epoch{epoch+1}.pkl"
-            print("Saving...")
-            self.save(self.best_model_filename_val)
+            if val_acc > self.best_val_acc:
+                self.best_val_acc = val_acc
+                self.best_model_filename_val = f"val_acc{val_acc:.4f}_vloss{val_loss:.4f}_epoch{epoch+1}.pkl"
+                print("Saving...")
+                self.save(self.best_model_filename_val)
 
             learning_rate *= decay
 
-        print(f"Epoch {epoch+1}/{epochs} | Train Loss: {epoch_loss:.4f} | Train Acc: {epoch_acc:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}")
+            print(f"Epoch {epoch+1}/{epochs} | Train Loss: {epoch_loss:.4f} | Train Acc: {epoch_acc:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}")
 
             
     def save(self, path):
