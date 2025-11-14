@@ -2,6 +2,7 @@
 import numpy as cp
 import pickle
 import random
+import os
 
 class model():
     def __init__(self):
@@ -121,6 +122,10 @@ class model():
                 self.best_model_filename_val = None
 
             if val_acc > self.best_val_acc:
+                if self.best_model_filename_val is not None:
+                    if os.path.exists(self.best_model_filename_val):
+                        os.remove(self.best_model_filename_val)
+
                 self.best_val_acc = val_acc
                 self.best_model_filename_val = f"val_acc{val_acc:.4f}_vloss{val_loss:.4f}_epoch{epoch+1}.pkl"
                 print("Saving...")
