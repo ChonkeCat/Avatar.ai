@@ -1,7 +1,10 @@
 # the dense layer class
 from .layer import Layer
 from typing import Tuple
-import numpy as cp # change is cupy if using gpu
+try:
+    import cupy as cp
+except ImportError:
+    import numpy as cp
 
 class dense(Layer):
     def __init__(self, neurons: int, activation_func, input_shape: Tuple[int, int, int, int] = None, first = False):

@@ -1,4 +1,7 @@
-import numpy as np
+try:
+    import cupy as np
+except ImportError:
+    import numpy as np
 from typing import Tuple, Optional
 
 class Im2Col:

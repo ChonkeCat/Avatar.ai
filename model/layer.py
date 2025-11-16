@@ -1,5 +1,8 @@
 #layer definition, skeleton class for layers
-import numpy as cp # change is cupy if using gpu
+try:
+    import cupy as cp
+except ImportError:
+    import numpy as cp
 from typing import Tuple
 
 class Layer():

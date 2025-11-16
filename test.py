@@ -1,4 +1,10 @@
-import numpy as cp
+try:
+    import cupy as cp
+    GPU_AVAILABLE = True
+except ImportError:
+    import numpy as cp
+    GPU_AVAILABLE = False
+print("Backend:", "CuPy (GPU)" if GPU_AVAILABLE else "NumPy (CPU)")
 from model.model import model
 from model.dense import dense
 from model.Conv2D import Conv2D

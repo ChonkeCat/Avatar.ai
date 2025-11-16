@@ -1,5 +1,8 @@
 #helper functions for the CNN, e.g. loading dataset, ReLU, padding, etc.
-import numpy as cp
+try:
+    import cupy as cp
+except ImportError:
+    import numpy as cp
 from PIL import Image
 import os
 

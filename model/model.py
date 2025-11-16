@@ -1,5 +1,8 @@
 #model architecture definition, e.g. forward pass, etc.
-import numpy as cp
+try:
+    import cupy as cp
+except ImportError:
+    import numpy as cp
 import pickle
 import random
 import os
@@ -36,13 +39,12 @@ class model():
             gradient = layer.backward(gradient)
         return gradient
     
-    def update(self, learning_rate, batch_size, beta1=0.9, beta2=0.99):
+    def update(self, learning_rate, beta1=0.9, beta2=0.99):
         for layer, lr_ratio in zip(self.layers, self.learning_rate_mask):
             actual_learning_rate = lr_ratio * learning_rate
 
-            # Scale gradients by batch size
-            grad_W = layer.dW / batch_size
-            grad_b = layer.db / batch_size
+            grad_W = layer.dW
+            grad_b = layer.db
 
             # Adam updates for weights
             layer.mo = beta1 * layer.mo + (1 - beta1) * grad_W
@@ -91,7 +93,7 @@ class model():
 
                 self.backward(loss_func(batch_y, pred, grad=True))
 
-                self.update(learning_rate, batch_size=batch_x.shape[0])
+                self.update(learning_rate)
 
                 total_correct += one_hot_accuracy(pred, batch_y)
                 total_samples += batch_x.shape[0]

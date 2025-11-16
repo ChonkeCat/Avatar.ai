@@ -1,7 +1,10 @@
 # the pooling layer class
 from .layer import Layer
 from typing import Tuple
-import numpy as cp # change is cupy if using gpu
+try:
+    import cupy as cp
+except ImportError:
+    import numpy as cp
 
 class Pool(Layer):
     def __init__(self, pool_size: Tuple[int, int], stride: int = 2, input_shape: Tuple[int, int, int] = None, activation: str = None, first: bool = False):
