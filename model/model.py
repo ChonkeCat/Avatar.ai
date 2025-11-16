@@ -1,19 +1,11 @@
 #model architecture definition, e.g. forward pass, etc.
 try:
     import cupy as cp
-    GPU = True
 except ImportError:
     import numpy as cp
-    GPU = False
 import pickle
 import random
 import os
-import time
-
-
-def sync():
-    if GPU:
-        cp.cuda.Stream.null.synchronize()
 
 class model():
     def __init__(self):
@@ -39,34 +31,15 @@ class model():
 
     def forward(self, inputs):
         for layer in self.layers:
-            sync()
-            start = time.time()
-
             inputs = layer.forward(inputs)
-
-            sync()
-            end = time.time()
-
-            print(f"[FORWARD] {layer.__class__.__name__:<20} {end - start:.6f} sec")
         return inputs
     
     def backward(self, gradient):
         for layer in reversed(self.layers):
-            sync()
-            start = time.time()
-
             gradient = layer.backward(gradient)
-
-            sync()
-            end = time.time()
-
-            print(f"[BACKWARD] {layer.__class__.__name__:<20} {end - start:.6f} sec")
         return gradient
     
     def update(self, learning_rate, beta1=0.9, beta2=0.99):
-        sync()
-        start = time.time()
-
         for layer, lr_ratio in zip(self.layers, self.learning_rate_mask):
             actual_learning_rate = lr_ratio * learning_rate
 
@@ -82,10 +55,6 @@ class model():
             layer.mo_b = beta1 * layer.mo_b + (1 - beta1) * grad_b
             layer.acc_b = beta2 * layer.acc_b + (1 - beta2) * (grad_b * grad_b)
             layer.b -= actual_learning_rate * layer.mo_b / (cp.sqrt(layer.acc_b) + 1e-7)
-
-            sync()
-            end = time.time()
-            print(f"[UPDATE] {end - start:.6f} sec")
 
     def train(self, loss_func, x, y, epochs = 50, learning_rate = 0.001, decay = 0.96, batch_size = 64):
         combined = list(zip(x, y))
@@ -121,12 +90,7 @@ class model():
             for batch_num, (batch_x, batch_y) in enumerate(train_batches, start=1):
                 pred = self.forward(batch_x)
 
-                sync()
-                start = time.time()
                 total_loss += loss_func(batch_y, pred, grad=False)
-                sync()
-                end = time.time()
-                print(f"[LOSS CALC] {end - start:.6f} sec")
 
                 self.backward(loss_func(batch_y, pred, grad=True))
 

@@ -56,9 +56,10 @@ class Conv2D(Layer):
 
         # setting up values (set everythig to 0.0)
         #momentum, accumulator, gradient (derivative wrt Weight)
-        self.momentum = np.full(self.W.shape, 0.0)
-        self.accumulator = np.full(self.W.shape, 0.0)
-        self.dW = np.full(self.W.shape, 0.0)
+        # self.momentum = np.full(self.W.shape, 0.0)
+        self.momentum = np.zeros(self.W.shape)
+        self.accumulator = np.zeros(self.W.shape)
+        self.dW = np.zeros(self.W.shape)
         self.momentum_b= np.zeros(self.b.shape)
         self.accumulator_b = np.zeros(self.b.shape)
 
@@ -96,8 +97,9 @@ class Conv2D(Layer):
         w = np.transpose(self.W, (3, 2, 0, 1))
 
         self.cols = Im2Col.im2col(
-            array=np.moveaxis(A_prev, -1, 1),
-            filter_dim=(filter_h, filter_w),
+            X=np.moveaxis(A_prev, -1, 1),
+            HF = filter_h,
+            WF=filter_w,
             pad=pad[0],
             stride=self.stride
         )
@@ -128,9 +130,10 @@ class Conv2D(Layer):
         output_cols = w.reshape(n_f, -1).T.dot(da_curr_reshaped)
 
         output = Im2Col.col2im(
-            cols=output_cols,
-            array_shape=np.moveaxis(self.A_prev, -1, 1).shape,
-            filter_dim=(filter_h, filter_w),
+            dX_col=output_cols,
+            X_shape=np.moveaxis(self.A_prev, -1, 1).shape,
+            HF=filter_h,
+            WF=filter_w,
             pad=pad[0],
             stride=self.stride
         )

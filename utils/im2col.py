@@ -10,87 +10,109 @@ class Im2Col:
     """
     
     @staticmethod
-    def im2col(array: np.ndarray, filter_dim: Tuple[int, int], pad: int, stride: int) -> np.ndarray:
+    def get_indices(in_shape, filter_h, filter_w, stride, padding):
         """
-        Transform image to columns for convolution operation
-        
-        Args:
-            array: Input array of shape (batch_size, channels, height, width)
-            filter_dim: (filter_height, filter_width)
-            pad: Padding size
-            stride: Stride size
-            
+        Returns index matrices in order to transform our input image into a matrix.
+
+        Parameters:
+        -X_shape: Input image shape.
+        -HF: filter height.
+        -WF: filter width.
+        -stride: stride value.
+        -pad: padding value.
+
         Returns:
-            Column matrix of shape (channels*filter_h*filter_w, batch_size*output_h*output_w)
-        """
-        batch_size, channels, height, width = array.shape
-        filter_h, filter_w = filter_dim
-        
-        # Calculate output dimensions
-        height_out = (height + 2 * pad - filter_h) // stride + 1
-        width_out = (width + 2 * pad - filter_w) // stride + 1
-        
-        # Pad the array if needed
-        if pad > 0:
-            array_padded = np.pad(array, ((0, 0), (0, 0), (pad, pad), (pad, pad)), mode='constant')
-        else:
-            array_padded = array
-        
-        # Initialize output columns
-        cols = np.zeros((channels * filter_h * filter_w, batch_size * height_out * width_out))
-        
-        # Extract patches
-        col_idx = 0
-        for b in range(batch_size):
-            for i in range(height_out):
-                for j in range(width_out):
-                    patch = array_padded[b, :, 
-                                       i*stride:i*stride+filter_h, 
-                                       j*stride:j*stride+filter_w]
-                    cols[:, col_idx] = patch.flatten()
-                    col_idx += 1
-                    
-        return cols
+        -i: matrix of index i.
+        -j: matrix of index j.
+        -d: matrix of index d. 
+            (Use to mark delimitation for each channel
+            during multi-dimensional arrays indexing).
+    """
     
+        # get input size
+        batch_size, channels, n_height, n_width = in_shape
+
+        # get output size
+        output_height = int((n_height + (2 * padding) - filter_h))//stride + 1
+        output_width = int((n_width + (2 * padding) - filter_w))//stride + 1
+
+        
+        # Compute i matrix
+        
+        level_one_i = np.repeat(np.arange(filter_w),filter_h)
+        level_one_i = np.tile(level_one_i, channels)
+        
+        every_level = stride * np.repeat(np.arange(output_height),output_width)
+        
+        i = level_one_i.reshape(-1,1) + every_level.reshape(1,-1)
+        
+        
+        # compute j matrix
+        
+        level_one_j = np.repeat(np.arange(filter_h),filter_w)
+        level_one_j = np.tile(level_one_j, channels)
+        
+        every_level = stride * np.repeat(np.arange(output_width),output_height)
+        
+        j = level_one_i.reshape(-1,1) + every_level.reshape(1,-1)
+        
+        
+        
+        # compute d matrix
+        d =  np.repeat(np.arange(channels),filter_h * filter_w).reshape(-1,1)
+        
+        return i,j,d
+        
     @staticmethod
-    def col2im(cols: np.ndarray, array_shape: Tuple, filter_dim: Tuple[int, int], 
-               pad: int, stride: int) -> np.ndarray:
+    def im2col(X, HF, WF, stride, pad):
         """
-        Transform columns back to image format
-        
-        Args:
-            cols: Column matrix from im2col
-            array_shape: Original array shape (batch_size, channels, height, width)
-            filter_dim: (filter_height, filter_width)
-            pad: Padding size used in im2col
-            stride: Stride size used in im2col
-            
-        Returns:
-            Reconstructed array of original shape
+            Transforms our input image into a matrix.
+
+            Parameters:
+            - X: input image.
+            - HF: filter height.
+            - WF: filter width.
+            - stride: stride value.
+            - pad: padding value.
+
+            Returns:
+            -cols: output matrix.
         """
-        batch_size, channels, height, width = array_shape
-        filter_h, filter_w = filter_dim
         
-        height_out = (height + 2 * pad - filter_h) // stride + 1
-        width_out = (width + 2 * pad - filter_w) // stride + 1
+        # Padding
+        X_padded = np.pad(X, ((0,0), (0,0), (pad, pad), (pad, pad)), mode='constant')
+        i, j, d = Im2Col.get_indices(X.shape, HF, WF, stride, pad)
+        # Multi-dimensional arrays indexing.
+        cols = X_padded[:, d, i, j]
+        cols = np.concatenate(cols, axis=-1)
+        return cols
         
-        array_padded = np.zeros((batch_size, channels, height + 2*pad, width + 2*pad))
-        
-        # Reconstruct from columns
-        col_idx = 0
-        for b in range(batch_size):
-            for i in range(height_out):
-                for j in range(width_out):
-                    patch = cols[:, col_idx].reshape(channels, filter_h, filter_w)
-                    array_padded[b, :, 
-                               i*stride:i*stride+filter_h, 
-                               j*stride:j*stride+filter_w] += patch
-                    col_idx += 1
-        
+    
+
+    @staticmethod
+    def col2im(dX_col, X_shape, HF, WF, stride, pad):
+        N, C, H, W = X_shape
+        H_padded, W_padded = H + 2*pad, W + 2*pad
+        X_padded = np.zeros((N, C, H_padded, W_padded))
+
+        i, j, d = Im2Col.get_indices(X_shape, HF, WF, stride, pad)
+
+        # Reshape dX_col to (C*HF*WF, out_h*out_w, N)
+        k, n_cols = dX_col.shape
+        out_h = (H + 2*pad - HF)//stride + 1
+        out_w = (W + 2*pad - WF)//stride + 1
+        dX_col_reshaped = dX_col.reshape(C*HF*WF, out_h*out_w, N)
+        dX_col_reshaped = dX_col_reshaped.transpose(2, 0, 1)  # (N, k, out_h*out_w)
+
+        # Scatter back to padded image
+        np.add.at(X_padded, (slice(None), d, i, j), dX_col_reshaped)
+
         # Remove padding
-        if pad > 0:
-            return array_padded[:, :, pad:-pad, pad:-pad]
-        return array_padded
+        if pad == 0:
+            return X_padded
+        return X_padded[:, :, pad:-pad, pad:-pad]
+
+
 
     @staticmethod
     def calculate_output_dim(input_dim: int, filter_dim: int, pad: int, stride: int) -> int:
