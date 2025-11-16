@@ -13,7 +13,7 @@ from model.pool import Pool
 from utils.cnn_utils import LeakyRelU, softmax, crossentropyloss, process_dataset
 
 # Dummy input (batch_size=2, features=10)
-x = cp.random.randn(64, 240, 320, 3)
+x = cp.random.randn(64, 120, 160, 3)
 
 # Dummy labels (e.g., for classification into 5 classes)
 y_true_small = cp.array([[0, 0, 1, 0],
@@ -23,7 +23,7 @@ y_true = cp.tile(y_true_small, (32, 1))
 
 # ---- MODEL SETUP ----
 net = model()
-net.add(Conv2D((3, 3), 64, LeakyRelU, padding='same', input_shape=(64, 240, 320, 3), first=True))
+net.add(Conv2D((3, 3), 64, LeakyRelU, padding='same', input_shape=(64, 120, 160, 3), first=True))
 net.add(Pool((2, 2), 52))
 net.add(Conv2D((3, 3), 64, LeakyRelU, padding='same'))
 net.add(Pool((2, 2), 2))
@@ -77,7 +77,8 @@ for i, (w_before, w_after) in enumerate(zip(W_before, W_after)):
 loss = crossentropyloss(y_true, y_pred)
 print("Loss:", float(loss))
 
-x, y = process_dataset("C:/Projects/CNN/data")
+x, y = process_dataset("C:/Projects/CNN/data_resized")
+x = [img.astype(cp.float32) / 255.0 for img in x]
 
 net.train(crossentropyloss, x, y)
 

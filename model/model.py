@@ -6,6 +6,7 @@ except ImportError:
 import pickle
 import random
 import os
+from tqdm import tqdm
 
 class model():
     def __init__(self):
@@ -83,61 +84,64 @@ class model():
             return (pred_class == true_class).sum()
 
         for epoch in range(epochs):
-            total_loss = 0
-            total_correct = 0
-            total_samples = 0
+            with tqdm(total=len(train_batches), desc=f"Epoch {epoch+1}/{epochs}", unit="batch") as pbar:
+                total_loss = 0
+                total_correct = 0
+                total_samples = 0
 
-            for batch_num, (batch_x, batch_y) in enumerate(train_batches, start=1):
-                pred = self.forward(batch_x)
+                for batch_num, (batch_x, batch_y) in enumerate(train_batches, start=1):
+                        pred = self.forward(batch_x)
 
-                total_loss += loss_func(batch_y, pred, grad=False)
+                        total_loss += loss_func(batch_y, pred, grad=False)
 
-                self.backward(loss_func(batch_y, pred, grad=True))
+                        self.backward(loss_func(batch_y, pred, grad=True))
 
-                self.update(learning_rate)
+                        self.update(learning_rate)
 
-                total_correct += one_hot_accuracy(pred, batch_y)
-                total_samples += batch_x.shape[0]
+                        total_correct += one_hot_accuracy(pred, batch_y)
+                        total_samples += batch_x.shape[0]
 
-                print(f"Processed train batch {batch_num}/{len(train_batches)}")
+                        pbar.set_postfix({
+                            'Loss': f"{(total_loss/total_samples):.4f}",
+                            'Acc': f"{(total_correct/total_samples):.4f}"
+                        })
+                        pbar.update(1)
+                        
+                epoch_loss = total_loss / total_samples
+                epoch_acc  = total_correct / total_samples
+
+                val_loss = 0
+                val_correct = 0
+                val_samples = 0
+
+                for batch_num, (batch_x, batch_y) in enumerate(val_batches, start=1):
+                    pred = self.forward(batch_x)
                     
-            epoch_loss = total_loss / total_samples
-            epoch_acc  = total_correct / total_samples
+                    val_loss += loss_func(batch_y, pred, grad=False)
+                    val_correct += one_hot_accuracy(pred, batch_y)
+                    val_samples += batch_x.shape[0]
 
-            val_loss = 0
-            val_correct = 0
-            val_samples = 0
 
-            for batch_num, (batch_x, batch_y) in enumerate(val_batches, start=1):
-                pred = self.forward(batch_x)
-                
-                val_loss += loss_func(batch_y, pred, grad=False)
-                val_correct += one_hot_accuracy(pred, batch_y)
-                val_samples += batch_x.shape[0]
+                val_loss = val_loss / val_samples
+                val_acc = val_correct / val_samples
 
-                print(f"Processed val batch {batch_num}/{len(val_batches)}")
+                if not hasattr(self, "best_val_acc"):
+                    self.best_val_acc = 0
+                    self.best_model_filename_val = None
 
-            val_loss = val_loss / val_samples
-            val_acc = val_correct / val_samples
+                if val_acc > self.best_val_acc:
+                    if self.best_model_filename_val is not None:
+                        if os.path.exists(self.best_model_filename_val):
+                            os.remove(self.best_model_filename_val)
 
-            if not hasattr(self, "best_val_acc"):
-                self.best_val_acc = 0
-                self.best_model_filename_val = None
+                    self.best_val_acc = val_acc
+                    self.best_model_filename_val = f"val_acc{val_acc:.4f}_vloss{val_loss:.4f}_epoch{epoch+1}.pkl"
+                    print("Saving...")
+                    self.save(self.best_model_filename_val)
 
-            if val_acc > self.best_val_acc:
-                if self.best_model_filename_val is not None:
-                    if os.path.exists(self.best_model_filename_val):
-                        os.remove(self.best_model_filename_val)
+                learning_rate *= decay
 
-                self.best_val_acc = val_acc
-                self.best_model_filename_val = f"val_acc{val_acc:.4f}_vloss{val_loss:.4f}_epoch{epoch+1}.pkl"
-                print("Saving...")
-                self.save(self.best_model_filename_val)
-
-            learning_rate *= decay
-
-            print(f"Epoch {epoch+1}/{epochs} | Train Loss: {epoch_loss:.4f} | Train Acc: {epoch_acc:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}")
-
+                print(f"Epoch {epoch+1}/{epochs} | Train Loss: {epoch_loss:.4f} | Train Acc: {epoch_acc:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}")
             
     def save(self, path):
         save = open(path, "wb")
