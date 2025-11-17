@@ -65,54 +65,62 @@ class model():
         return float(total_norm)
     
     def update(self, learning_rate, beta1=0.9, beta2=0.999, batch_size=32):
-        self.t += 1  # Increment time step
+        self.t += 1
         
-        # Apply gradient clipping and averaging without modifying original arrays
-        total_norm_sq = 0.0
-        grad_list = []
-        
+        # FIRST: Divide gradients by batch size
         for layer in self.layers:
             if hasattr(layer, 'dW') and layer.dW.size > 1:
-                grad_W = layer.dW / batch_size  # Create new array, don't modify in-place
-                total_norm_sq += float(cp.sum(grad_W ** 2))
-                grad_list.append(('W', layer, grad_W))
-                
+                layer.dW = layer.dW / batch_size  # Don't use /=, create new array
             if hasattr(layer, 'db') and layer.db.size > 1:
-                grad_b = layer.db / batch_size
-                total_norm_sq += float(cp.sum(grad_b ** 2))
-                grad_list.append(('b', layer, grad_b))
+                layer.db = layer.db / batch_size
         
-        # Clip gradients
+        # SECOND: Clip gradients BEFORE computing norms for display
+        total_norm_sq = 0.0
+        for layer in self.layers:
+            if hasattr(layer, 'dW') and layer.dW.size > 1:
+                total_norm_sq += float(cp.sum(layer.dW ** 2))
+            if hasattr(layer, 'db') and layer.db.size > 1:
+                total_norm_sq += float(cp.sum(layer.db ** 2))
+        
         total_norm = cp.sqrt(total_norm_sq)
-        clip_coef = min(5.0 / (total_norm + 1e-6), 1.0)
         
-        # Now update with Adam using the clipped, averaged gradients
-        for grad_type, layer, grad in grad_list:
-            lr_idx = self.layers.index(layer)
+        # Clip to prevent explosion
+        max_norm = 5.0
+        clip_coef = min(max_norm / (float(total_norm) + 1e-8), 1.0)
+        
+        if clip_coef < 1.0:
+            for layer in self.layers:
+                if hasattr(layer, 'dW') and layer.dW.size > 1:
+                    layer.dW = layer.dW * clip_coef
+                if hasattr(layer, 'db') and layer.db.size > 1:
+                    layer.db = layer.db * clip_coef
+        
+        # THIRD: Apply Adam updates
+        for lr_idx, layer in enumerate(self.layers):
             lr_ratio = self.learning_rate_mask[lr_idx]
-            actual_learning_rate = lr_ratio * learning_rate
+            actual_lr = lr_ratio * learning_rate
             
-            if grad_type == 'W':
-                grad_clipped = grad * clip_coef
-                
-                layer.mo = beta1 * layer.mo + (1 - beta1) * grad_clipped
-                layer.acc = beta2 * layer.acc + (1 - beta2) * (grad_clipped * grad_clipped)
+            if hasattr(layer, 'dW') and layer.dW.size > 1:
+                # Adam for weights
+                layer.mo = beta1 * layer.mo + (1 - beta1) * layer.dW
+                layer.acc = beta2 * layer.acc + (1 - beta2) * (layer.dW ** 2)
                 
                 mo_corrected = layer.mo / (1 - beta1 ** self.t)
                 acc_corrected = layer.acc / (1 - beta2 ** self.t)
                 
-                layer.W -= actual_learning_rate * mo_corrected / (cp.sqrt(acc_corrected) + 1e-8)
+                layer.W = layer.W - actual_lr * mo_corrected / (cp.sqrt(acc_corrected) + 1e-8)
                 
-            elif grad_type == 'b':
-                grad_clipped = grad * clip_coef
-                
-                layer.mo_b = beta1 * layer.mo_b + (1 - beta1) * grad_clipped
-                layer.acc_b = beta2 * layer.acc_b + (1 - beta2) * (grad_clipped * grad_clipped)
+            if hasattr(layer, 'db') and layer.db.size > 1:
+                # Adam for biases
+                layer.mo_b = beta1 * layer.mo_b + (1 - beta1) * layer.db
+                layer.acc_b = beta2 * layer.acc_b + (1 - beta2) * (layer.db ** 2)
                 
                 mo_b_corrected = layer.mo_b / (1 - beta1 ** self.t)
                 acc_b_corrected = layer.acc_b / (1 - beta2 ** self.t)
                 
-                layer.b -= actual_learning_rate * mo_b_corrected / (cp.sqrt(acc_b_corrected) + 1e-8)
+                layer.b = layer.b - actual_lr * mo_b_corrected / (cp.sqrt(acc_b_corrected) + 1e-8)
+        
+        return float(total_norm)  # Return BEFORE clipping for monitoring
 
     def train(self, loss_func, x, y, epochs = 50, learning_rate = 0.001, decay = 0.96, batch_size = 64):
         combined = list(zip(x, y))
@@ -147,42 +155,46 @@ class model():
                 total_samples = 0
 
                 for batch_num, (batch_x, batch_y) in enumerate(train_batches, start=1):
-                        # Zero gradients before backward pass
-                        for layer in self.layers:
-                            if hasattr(layer, 'dW') and layer.dW.size > 1:
-                                layer.dW[:] = 0  # In-place zero to maintain shape
-                            if hasattr(layer, 'db') and layer.db.size > 1:
-                                layer.db[:] = 0
-                        
-                        pred = self.forward(batch_x)
-                        
-                        # Check for NaN in predictions
-                        if cp.any(cp.isnan(pred)) or cp.any(cp.isinf(pred)):
-                            print(f"\nWARNING: NaN/Inf in predictions at batch {batch_num}")
-                            print(f"Pred min: {pred.min()}, max: {pred.max()}")
-                            break
-                        
-                        loss = loss_func(batch_y, pred, grad=False)
-                        grad = loss_func(batch_y, pred, grad=True)
-
-                        total_loss += loss * batch_x.shape[0]
-
-                        self.backward(grad)
-                        
-                        # Gradient clipping
-                        grad_norm = self.clip_gradients(max_norm=5.0)
-
-                        self.update(learning_rate, batch_size=batch_x.shape[0])
-
-                        total_correct += one_hot_accuracy(pred, batch_y)
-                        total_samples += batch_x.shape[0]
-
-                        pbar.set_postfix({
-                            'Loss': f"{(total_loss/total_samples):.4f}",
-                            'Acc': f"{(total_correct/total_samples):.4f}",
-                            'GradNorm': f"{grad_norm:.2f}"
-                        })
-                        pbar.update(1)
+                    # Zero gradients before backward pass
+                    for layer in self.layers:
+                        if hasattr(layer, 'dW') and layer.dW.size > 1:
+                            layer.dW[:] = 0
+                        if hasattr(layer, 'db') and layer.db.size > 1:
+                            layer.db[:] = 0
+                    
+                    pred = self.forward(batch_x)
+                    
+                    # Check for NaN in predictions
+                    if cp.any(cp.isnan(pred)) or cp.any(cp.isinf(pred)):
+                        print(f"\nWARNING: NaN/Inf in predictions at batch {batch_num}")
+                        print(f"Pred min: {pred.min()}, max: {pred.max()}")
+                        break
+                    
+                    loss = loss_func(batch_y, pred, grad=False)
+                    grad = loss_func(batch_y, pred, grad=True)
+                    
+                    # CRITICAL FIX: Normalize gradient from loss function by batch size FIRST
+                    # This prevents overflow before backward pass
+                    grad = grad / batch_x.shape[0]
+                    
+                    total_loss += loss * batch_x.shape[0]
+                    
+                    self.backward(grad)
+                    
+                    # Now gradients are already averaged, so pass batch_size=1 to update
+                    # to prevent double division
+                    grad_norm = self.clip_gradients(max_norm=5.0)
+                    self.update(learning_rate, batch_size=1)  # batch_size=1 since already normalized
+                    
+                    total_correct += one_hot_accuracy(pred, batch_y)
+                    total_samples += batch_x.shape[0]
+                    
+                    pbar.set_postfix({
+                        'Loss': f"{(total_loss/total_samples):.4f}",
+                        'Acc': f"{(total_correct/total_samples):.4f}",
+                        'GradNorm': f"{grad_norm:.2f}"
+                    })
+                    pbar.update(1)
                         
                 epoch_loss = total_loss / total_samples
                 epoch_acc  = total_correct / total_samples
