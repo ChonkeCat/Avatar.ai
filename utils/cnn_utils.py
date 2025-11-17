@@ -24,7 +24,7 @@ def softmax(x, grad = False):
 ## inputs: x -> float, grad => true if you want the gradiant, false otherwise
 
 def LeakyRelU(x, grad=False):
-    alpha = 0.05
+    alpha = 0.01
     if grad:
         return cp.where(x > 0, 1.0, alpha)
     return cp.maximum(alpha * x, x)
@@ -37,14 +37,32 @@ def crossentropyloss(y_actual, y_pred, grad=False):
         loss = -cp.mean(cp.sum(y_actual * cp.log(y_pred), axis=1))
         return loss
 
-def process_dataset(path):
+def augment_image(image):
+    """Apply random augmentations to reduce overfitting"""
+    # Random flip
+    if cp.random.rand() > 0.5:
+        image = image[:, ::-1, :]  # Horizontal flip
+    
+    # Random rotation (small angles)
+    if cp.random.rand() > 0.5:
+        angle = cp.random.uniform(-10, 10)
+        # Implement rotation logic here
+    
+    # Random brightness
+    brightness_factor = cp.random.uniform(0.8, 1.2)
+    image = image * brightness_factor
+    image = cp.clip(image, 0, 1)
+    
+    return image
+
+def process_dataset(path, augment=False):
     images = []
     labels = []
     folders = [f for f in os.listdir(path) if os.path.isdir(os.path.join(path, f))]
 
     for i, folder in enumerate(folders):
-        label = [0] * len(folders)
-        label[i] = 1
+        label = cp.zeros(len(folders), dtype=cp.float32)
+        label[i] = 1.0
 
         folder_path = os.path.join(path, folder)
         for file_name in os.listdir(folder_path):
@@ -52,8 +70,16 @@ def process_dataset(path):
             if os.path.isfile(file_path):
                 try:
                     img = Image.open(file_path).convert("RGB")
-                    images.append(cp.asarray(img))
+                    img_array = cp.asarray(img).astype(cp.float32) / 255.0
+                    images.append(img_array)
                     labels.append(label)
+                    
+                    # Add augmented versions
+                    if augment:
+                        augmented_img = augment_image(img_array)
+                        images.append(augmented_img)
+                        labels.append(label)
+                        
                 except Exception as e:
                     print(f"Skipping {file_path}: {e}")
 

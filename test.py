@@ -10,28 +10,31 @@ from model.dense import dense
 from model.Conv2D import Conv2D
 from model.flatten import flatten
 from model.pool import Pool
+from model.dropout import Dropout
 from utils.cnn_utils import LeakyRelU, softmax, crossentropyloss, process_dataset
 
+batch_size = 96
 # Dummy input (batch_size=2, features=10)
-x = cp.random.randn(64, 120, 160, 3)
+x = cp.random.randn(batch_size, 80, 80, 3)
 
 # Dummy labels (e.g., for classification into 5 classes)
-y_true_small = cp.array([[0, 0, 1, 0],
-                   [0, 1, 0, 0]])
-y_true = cp.tile(y_true_small, (32, 1))
+y_true_small = cp.array([0, 0, 1, 0])
+y_true = cp.tile(y_true_small, (batch_size, 1))
 
 
 # ---- MODEL SETUP ----
 net = model()
-net.add(Conv2D((3, 3), 64, LeakyRelU, padding='same', input_shape=(64, 120, 160, 3), first=True))
-net.add(Pool((2, 2), 52))
-net.add(Conv2D((3, 3), 64, LeakyRelU, padding='same'))
+net.add(Conv2D((5, 5), 32, LeakyRelU, padding='same', input_shape=(batch_size, 80, 80, 3), first=True), lr_ratio=1.0)
 net.add(Pool((2, 2), 2))
-net.add(Conv2D((5, 5), 96, LeakyRelU, padding='same'))
+net.add(Conv2D((3, 3), 64, LeakyRelU, padding='same'), lr_ratio=1.0)
+net.add(Pool((2, 2), 2))
+net.add(Conv2D((3, 3), 96, LeakyRelU, padding='same'), lr_ratio=1.0)
 net.add(flatten())
-net.add(dense(512, LeakyRelU), lr_ratio=0.1)
-net.add(dense(512, LeakyRelU), lr_ratio=0.1)
-net.add(dense(4, softmax), lr_ratio=1.0)
+net.add(dense(256, LeakyRelU), lr_ratio=0.1)
+net.add(Dropout(0.2))
+net.add(dense(128, LeakyRelU), lr_ratio=0.1)
+net.add(Dropout(0.2))
+net.add(dense(4, softmax), lr_ratio=0.5)
 
 # Compile model with input shape
 net.compile()
@@ -77,9 +80,8 @@ for i, (w_before, w_after) in enumerate(zip(W_before, W_after)):
 loss = crossentropyloss(y_true, y_pred)
 print("Loss:", float(loss))
 
-x, y = process_dataset("C:/Projects/CNN/data_resized")
-x = [img.astype(cp.float32) / 255.0 for img in x]
+x, y = process_dataset("C:/Projects/CNN/data_resized", augment=False)
 
-net.train(crossentropyloss, x, y)
+net.train(crossentropyloss, x, y, batch_size=batch_size, learning_rate=0.0000009, epochs=30, decay=0.98)
 
 

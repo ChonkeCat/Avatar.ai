@@ -39,7 +39,7 @@ class Im2Col:
         
         # Compute i matrix
         
-        level_one_i = np.repeat(np.arange(filter_w),filter_h)
+        level_one_i = np.repeat(np.arange(filter_h),filter_w)
         level_one_i = np.tile(level_one_i, channels)
         
         every_level = stride * np.repeat(np.arange(output_height),output_width)
@@ -49,14 +49,12 @@ class Im2Col:
         
         # compute j matrix
         
-        level_one_j = np.repeat(np.arange(filter_h),filter_w)
+        level_one_j = np.tile(np.arange(filter_w), filter_h)
         level_one_j = np.tile(level_one_j, channels)
         
-        every_level = stride * np.repeat(np.arange(output_width),output_height)
+        every_level_j = stride * np.tile(np.arange(output_width), output_height)
         
-        j = level_one_i.reshape(-1,1) + every_level.reshape(1,-1)
-        
-        
+        j = level_one_j.reshape(-1, 1) + every_level_j.reshape(1, -1)
         
         # compute d matrix
         d =  np.repeat(np.arange(channels),filter_h * filter_w).reshape(-1,1)
@@ -78,13 +76,13 @@ class Im2Col:
             Returns:
             -cols: output matrix.
         """
-        
+        N, C, H, W = X.shape
         # Padding
         X_padded = np.pad(X, ((0,0), (0,0), (pad, pad), (pad, pad)), mode='constant')
         i, j, d = Im2Col.get_indices(X.shape, HF, WF, stride, pad)
         # Multi-dimensional arrays indexing.
         cols = X_padded[:, d, i, j]
-        cols = np.concatenate(cols, axis=-1)
+        cols = cols.transpose(1, 2, 0).reshape(C*HF*WF, -1)
         return cols
         
     

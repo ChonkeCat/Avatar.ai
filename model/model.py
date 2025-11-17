@@ -91,10 +91,12 @@ class model():
 
                 for batch_num, (batch_x, batch_y) in enumerate(train_batches, start=1):
                         pred = self.forward(batch_x)
+                        loss = loss_func(batch_y, pred, grad=False)
+                        grad = loss_func(batch_y, pred, grad=True)
 
-                        total_loss += loss_func(batch_y, pred, grad=False)
+                        total_loss += loss * batch_x.shape[0]
 
-                        self.backward(loss_func(batch_y, pred, grad=True))
+                        self.backward(grad)
 
                         self.update(learning_rate)
 
@@ -117,7 +119,7 @@ class model():
                 for batch_num, (batch_x, batch_y) in enumerate(val_batches, start=1):
                     pred = self.forward(batch_x)
                     
-                    val_loss += loss_func(batch_y, pred, grad=False)
+                    val_loss += loss_func(batch_y, pred, grad=False) * batch_x.shape[0]
                     val_correct += one_hot_accuracy(pred, batch_y)
                     val_samples += batch_x.shape[0]
 
@@ -139,7 +141,7 @@ class model():
                     print("Saving...")
                     self.save(self.best_model_filename_val)
 
-                learning_rate *= decay
+                learning_rate = learning_rate * decay
 
                 print(f"Epoch {epoch+1}/{epochs} | Train Loss: {epoch_loss:.4f} | Train Acc: {epoch_acc:.4f} | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}")
             

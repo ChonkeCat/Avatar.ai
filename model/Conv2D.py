@@ -48,11 +48,17 @@ class Conv2D(Layer):
         '''
         # print(input_shape)
         # make a matrix of filter_size and then divide everything by its size to scale down
-        self.W = np.random.randn(self.filter_size[0], self.filter_size[1],
-            self.depth, self.n_filters)/(self.filter_size[0]*self.filter_size[1])
-        
-        # create bias 1D matrix and multiplies by 0.01 to scale down
-        self.b = np.random.randn(self.n_filters) * 0.01
+        fan_in = self.filter_size[0] * self.filter_size[1] * self.depth
+
+        self.W = (np.random.randn(
+            self.filter_size[0],
+            self.filter_size[1],
+            self.depth,
+            self.n_filters
+        ) * np.sqrt(2.0 / fan_in)).astype(np.float32)
+
+        # Small random bias initialization
+        self.b = np.zeros(self.n_filters, dtype=np.float32)
 
         # setting up values (set everythig to 0.0)
         #momentum, accumulator, gradient (derivative wrt Weight)
@@ -87,14 +93,14 @@ class Conv2D(Layer):
 
     def forward(self, A_prev):
         self.inputs = A_prev
-        self.A_prev = np.array(A_prev, copy=True)
+        self.A_prev = A_prev
         n = A_prev.shape[0]
         height_out = self.shape_after_conv[1]
         width_out = self.shape_after_conv[2]
 
         filter_h, filter_w, _, n_f = self.W.shape
         pad = self.calculate_pad_dims()
-        w = np.transpose(self.W, (3, 2, 0, 1))
+        w = np.transpose(self.W, (3, 0, 1, 2))
 
         self.cols = Im2Col.im2col(
             X=np.moveaxis(A_prev, -1, 1),
@@ -103,9 +109,12 @@ class Conv2D(Layer):
             pad=pad[0],
             stride=self.stride
         )
-        result = w.reshape((n_f, -1)).dot(self.cols)
-        output = result.reshape(n_f, height_out, width_out, n)
-        self.Z = output.transpose(3, 1, 2, 0) + self.b
+        # Multiply flattened filters with columns
+        result = w.reshape(n_f, -1).dot(self.cols)
+
+        # Reshape carefully to match NHWC output
+        output = result.reshape(n_f, height_out, width_out, n)  # (n_filters, H_out, W_out, batch)
+        self.Z = output.transpose(3, 1, 2, 0) + self.b     # (batch, H_out, W_out, n_filters)
         self.A = self.activation_func(self.Z)
         return self.A
             
@@ -113,22 +122,27 @@ class Conv2D(Layer):
     
     def backward(self, dLdA):
         batch_size = dLdA.shape[0]
-
         filter_h, filter_w, _, n_f = self.W.shape
         pad = self.calculate_pad_dims()
 
-        # bias gradient calculation
-        self.db = dLdA.sum(axis=(0, 1, 2)) / batch_size
-        
-        # dLdA reshapes to prep for matrix stuff
-        da_curr_reshaped = dLdA.transpose(3, 1, 2, 0).reshape(n_f, -1)
+        # Correct gradient w.r.t Z (include activation)
+        dLdZ = self.activation_func(self.Z, grad=True) * dLdA
+        self.db = dLdZ.sum(axis=(0, 1, 2)) / batch_size
 
-        w = np.transpose(self.W, (3, 2, 0, 1))
+        # Reshape for matrix multiplication
+        da_curr_reshaped = dLdZ.transpose(3, 1, 2, 0).reshape(n_f, -1)  # (out, out_h*out_w*batch)
+
+        # Use same W ordering as forward
+        w = np.transpose(self.W, (3, 0, 1, 2))  # (out, h, w, in)
+
+        # Compute dw in (out, h, w, in) ordering
         dw = da_curr_reshaped.dot(self.cols.T).reshape(w.shape)
-        self.dW = np.transpose(dw, (2, 3, 1, 0))/batch_size
 
+        # Convert dw back to (h, w, in, out)
+        self.dW = np.transpose(dw, (1, 2, 3, 0)) / batch_size
+
+        # Gradient w.r.t input
         output_cols = w.reshape(n_f, -1).T.dot(da_curr_reshaped)
-
         output = Im2Col.col2im(
             dX_col=output_cols,
             X_shape=np.moveaxis(self.A_prev, -1, 1).shape,

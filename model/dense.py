@@ -15,7 +15,8 @@ class dense(Layer):
         input_length = input_shape[1]
         bias_shape = (1, self.neurons)
         self.out_shape = [input_shape[0], self.neurons]
-        self.W = cp.random.randn(self.neurons, input_length)/cp.sqrt(input_length)
+        fan_in = input_length
+        self.W = cp.random.randn(self.neurons, input_length) * cp.sqrt(2.0 / fan_in)
         self.b = cp.full(bias_shape, 0.0, dtype=cp.float32)
         self.db = cp.full(bias_shape, 0.0, dtype=cp.float32)
         #optimizer stuff
@@ -32,12 +33,15 @@ class dense(Layer):
         return self.A
 
     def backward(self, gradient):
-        pre_activation_wrt_activation_gradient = self.activation_func(self.A, grad=True)
-        pre_activation_gradient = pre_activation_wrt_activation_gradient * gradient
-
-        pre_activation_wrt_weights_gradient = self.A_prev
         batch = self.A_prev.shape[0]
-        self.dW = cp.dot(pre_activation_gradient.T, pre_activation_wrt_weights_gradient)/batch
-        self.db = pre_activation_gradient.sum(axis=0, keepdims=True)/batch
-        prev_gradient = pre_activation_gradient.dot(self.W)
-        return prev_gradient
+        
+        # Derivative of activation
+        dZ = self.activation_func(self.Z, grad=True) * gradient
+        
+        # Gradients wrt weights
+        self.dW = cp.dot(dZ.T, self.A_prev) / batch
+        self.db = cp.sum(dZ, axis=0, keepdims=True) / batch
+        
+        # Gradient to pass to previous layer
+        dA_prev = cp.dot(dZ, self.W)
+        return dA_prev
