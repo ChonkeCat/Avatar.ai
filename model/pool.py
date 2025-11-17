@@ -19,6 +19,18 @@ class Pool(Layer):
         h_out = (height - h_poll) // self.stride + 1
         w_out = (width - w_poll) // self.stride + 1
         self.output_shape = (batch_size, h_out, w_out, channels)
+        
+        # Pool layers don't have trainable parameters, but set dummy arrays
+        # so the optimizer doesn't break when checking hasattr
+        self.W = cp.array([])
+        self.dW = cp.array([])
+        self.b = cp.array([])
+        self.db = cp.array([])
+        self.mo = cp.array([])
+        self.acc = cp.array([])
+        self.mo_b = cp.array([])
+        self.acc_b = cp.array([])
+        
         return self.output_shape
 
     def forward(self, A_prev):

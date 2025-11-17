@@ -24,59 +24,44 @@ class Conv2D(Layer):
         self.filter_size = filter_size
         self.b = b
         self.stride = stride
-        self.kernel_size = filter_size  # Fixed typo: kernal_size -> kernel_size
-        self.padding = padding  # Removed duplicate stride assignment
+        self.kernel_size = filter_size
+        self.padding = padding
         
         self.cache = {}
         super().__init__(input_shape=input_shape,\
                     activation_func=activation_func,\
                     first=first)
         
-        
-    # example: conv_layer = Conv2D(filter_size=(3, 3), n_filters=32, ...)
-    # real application: Conv2D((3, 3), 64, LeakyRelU, padding='same', input_shape=(BATCH_SIZE, IMG_HEIGHT, IMG_WIDTH, 3), first=True)
     def initialize(self, input_shape=None):
         self.batch_size, self.height_in, self.width_in, self.depth = input_shape
         
-        '''
-        1. take random values from standard normal distribution, then creates a 4D TENSOR made up of
-        3x3 matrices of depth n_filters (e.g 32)
-        ex: [[ 0.11, -0.11,  0.22], 
-             [ 0.05, -0.08,  0.15],     
-             [ -0.09, 0.12, -0.04]]
-
-        '''
-        # print(input_shape)
-        # make a matrix of filter_size and then divide everything by its size to scale down
         fan_in = self.filter_size[0] * self.filter_size[1] * self.depth
+        fan_out = self.filter_size[0] * self.filter_size[1] * self.n_filters
+        
+        # Use Xavier/Glorot initialization for better stability
+        limit = np.sqrt(6.0 / (fan_in + fan_out))
+        
+        self.W = np.random.uniform(
+            -limit, limit,
+            size=(self.filter_size[0], self.filter_size[1], self.depth, self.n_filters)
+        ).astype(np.float32)
 
-        self.W = (np.random.randn(
-            self.filter_size[0],
-            self.filter_size[1],
-            self.depth,
-            self.n_filters
-        ) * np.sqrt(2.0 / fan_in)).astype(np.float32)
-
-        # Small random bias initialization
+        # Zero bias initialization
         self.b = np.zeros(self.n_filters, dtype=np.float32)
 
-        # setting up values (set everythig to 0.0)
-        #momentum, accumulator, gradient (derivative wrt Weight)
-        # self.momentum = np.full(self.W.shape, 0.0)
-        self.momentum = np.zeros(self.W.shape)
-        self.accumulator = np.zeros(self.W.shape)
-        self.dW = np.zeros(self.W.shape)
-        self.momentum_b= np.zeros(self.b.shape)
-        self.accumulator_b = np.zeros(self.b.shape)
+        # setting up values (set everything to 0.0)
+        # Use 'mo' and 'acc' for Adam optimizer (not 'momentum' and 'accumulator')
+        self.mo = np.zeros(self.W.shape, dtype=np.float32)
+        self.acc = np.zeros(self.W.shape, dtype=np.float32)
+        self.dW = np.zeros(self.W.shape, dtype=np.float32)
+        self.mo_b = np.zeros(self.b.shape, dtype=np.float32)
+        self.acc_b = np.zeros(self.b.shape, dtype=np.float32)
+        self.db = np.zeros(self.b.shape, dtype=np.float32)
 
         filter_h = self.W.shape[0]
         filter_w = self.W.shape[1]
         self.n_filters = self.W.shape[3]
         
-        
-        # same = with 0 padding, valid = no 0 padding
-        
-        # shape_after_conv calculates how big output is after filters (with/without padding)
         if self.padding == "same":
             self.shape_after_conv = (self.batch_size, self.height_in, self.width_in, self.n_filters)
             return self.shape_after_conv
@@ -84,7 +69,6 @@ class Conv2D(Layer):
             height_out = ((self.height_in - filter_h) // self.stride) + 1
             width_out = ((self.width_in - filter_w) // self.stride) + 1
             
-            # FIXED: Use the calculated output dimensions instead of input dimensions
             self.shape_after_conv = (self.batch_size, height_out, width_out, self.n_filters)
             return self.shape_after_conv
         else:
@@ -94,7 +78,7 @@ class Conv2D(Layer):
     def forward(self, A_prev):
         self.inputs = A_prev
         self.A_prev = A_prev
-        n = A_prev.shape[0]
+        batch_size = A_prev.shape[0]  # Use actual batch size, not stored one
         height_out = self.shape_after_conv[1]
         width_out = self.shape_after_conv[2]
 
@@ -113,7 +97,7 @@ class Conv2D(Layer):
         result = w.reshape(n_f, -1).dot(self.cols)
 
         # Reshape carefully to match NHWC output
-        output = result.reshape(n_f, height_out, width_out, n)  # (n_filters, H_out, W_out, batch)
+        output = result.reshape(n_f, height_out, width_out, batch_size)  # Use actual batch_size
         self.Z = output.transpose(3, 1, 2, 0) + self.b     # (batch, H_out, W_out, n_filters)
         self.A = self.activation_func(self.Z)
         return self.A
@@ -127,22 +111,30 @@ class Conv2D(Layer):
 
         # Correct gradient w.r.t Z (include activation)
         dLdZ = self.activation_func(self.Z, grad=True) * dLdA
-        self.db = dLdZ.sum(axis=(0, 1, 2)) / batch_size
+        
+        # Gradient w.r.t bias - sum over batch, height, width
+        self.db = dLdZ.sum(axis=(0, 1, 2))
 
-        # Reshape for matrix multiplication
-        da_curr_reshaped = dLdZ.transpose(3, 1, 2, 0).reshape(n_f, -1)  # (out, out_h*out_w*batch)
+        # Reshape dLdZ for convolution: (batch, h, w, filters) -> (filters, h, w, batch)
+        dLdZ_reshaped = dLdZ.transpose(3, 1, 2, 0)  # (n_filters, height_out, width_out, batch)
+        dLdZ_flattened = dLdZ_reshaped.reshape(n_f, -1)  # (n_filters, height_out*width_out*batch)
 
         # Use same W ordering as forward
         w = np.transpose(self.W, (3, 0, 1, 2))  # (out, h, w, in)
 
-        # Compute dw in (out, h, w, in) ordering
-        dw = da_curr_reshaped.dot(self.cols.T).reshape(w.shape)
+        # Compute gradient w.r.t weights
+        # self.cols is (filter_h*filter_w*channels, height_out*width_out*batch)
+        dw = dLdZ_flattened.dot(self.cols.T)  # (n_filters, filter_h*filter_w*channels)
+        dw = dw.reshape(w.shape)  # (n_filters, filter_h, filter_w, channels)
 
-        # Convert dw back to (h, w, in, out)
-        self.dW = np.transpose(dw, (1, 2, 3, 0)) / batch_size
+        # Convert back to (h, w, in, out) format
+        self.dW = np.transpose(dw, (1, 2, 3, 0))
 
         # Gradient w.r.t input
-        output_cols = w.reshape(n_f, -1).T.dot(da_curr_reshaped)
+        # w.reshape gives (n_filters, filter_h*filter_w*channels)
+        # dLdZ_flattened is (n_filters, height_out*width_out*batch)
+        output_cols = w.reshape(n_f, -1).T.dot(dLdZ_flattened)  # (filter_h*filter_w*channels, height_out*width_out*batch)
+        
         output = Im2Col.col2im(
             dX_col=output_cols,
             X_shape=np.moveaxis(self.A_prev, -1, 1).shape,

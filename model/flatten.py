@@ -15,6 +15,17 @@ class flatten(Layer):
         batch_size = input_shape[0]
         flattened_size = math.prod(input_shape[1:])
         self.out_shape = (batch_size, flattened_size)
+        
+        # Flatten layers don't have trainable parameters
+        self.W = cp.array([])
+        self.dW = cp.array([])
+        self.b = cp.array([])
+        self.db = cp.array([])
+        self.mo = cp.array([])
+        self.acc = cp.array([])
+        self.mo_b = cp.array([])
+        self.acc_b = cp.array([])
+        
         return self.out_shape
     
     def forward(self, A_prev):

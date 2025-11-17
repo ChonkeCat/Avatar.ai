@@ -33,14 +33,13 @@ class dense(Layer):
         return self.A
 
     def backward(self, gradient):
-        batch = self.A_prev.shape[0]
-        
+        # DON'T divide by batch - let optimizer handle it
         # Derivative of activation
         dZ = self.activation_func(self.Z, grad=True) * gradient
         
-        # Gradients wrt weights
-        self.dW = cp.dot(dZ.T, self.A_prev) / batch
-        self.db = cp.sum(dZ, axis=0, keepdims=True) / batch
+        # Gradients wrt weights - NO division by batch
+        self.dW = cp.dot(dZ.T, self.A_prev)
+        self.db = cp.sum(dZ, axis=0, keepdims=True)
         
         # Gradient to pass to previous layer
         dA_prev = cp.dot(dZ, self.W)
